@@ -2,9 +2,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>BlueTalk | Voice Over Bluetooth</title>
-    
-    
-    
     <!-- 
         TECHNICAL NOTE: 
         The Web Bluetooth API primarily handles low-energy (BLE) control and doesn't natively support 
@@ -91,35 +88,11 @@
                 </div>
             </div>
 
-            <div id="conn-panel" class="conn-panel">
-                <div class="setting-label">
-                    <span>Your ID (Tap to Copy)</span>
-                </div>
-                <div class="qr-wrapper">
-                    <div id="my-id" class="peer-id-box" onclick="copyMyId()">---</div>
-                    <div id="qrcode"></div>
-                </div>
-                
-                <div class="setting-label">
-                    <span>Connect to Remote Peer</span>
-                </div>
-                <div class="id-input-group">
-                    <input type="text" id="target-id" class="id-input" placeholder="Enter remote ID..." />
-                    <button id="btn-scan" class="btn-scan" onclick="startScanner()">
-                        <svg class="icon" viewBox="0 0 24 24"><path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3M7 12h10M12 7v10"/></svg>
-                    </button>
-                    <button id="btn-pair" class="btn-connect" onclick="pairDevice()">Connect</button>
-                </div>
-            </div>
-
-            <div id="scanner-modal">
-                <div id="reader"></div>
-                <div class="scanner-controls">
-                    <button class="btn-close-scanner" onclick="stopScanner()">Cancel Scan</button>
-                </div>
-            </div>
-
             <div class="controls">
+                <button id="btn-pair" class="main-btn btn-pair" onclick="pairDevice()">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M7 17l5-5-5-5M13 17l5-5-5-5"/></svg>
+                    <span>Pair Device</span>
+                </button>
                 <button id="btn-talk" class="main-btn btn-talk" disabled="" onclick="toggleTalk()">
                     <span id="talk-icon">▶</span>
                     <span id="talk-label">Start Talk</span>

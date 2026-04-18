@@ -16,10 +16,7 @@
                 peaking: null
             },
             volume: 0.8,
-            profile: 'normal',
-            peer: null,
-            remotePeerId: null,
-            activeCall: null
+            profile: 'normal'
         };
 
         const DOM = {
@@ -35,14 +32,8 @@
             viz: document.getElementById('viz'),
             volSlider: document.getElementById('vol-slider'),
             volVal: document.getElementById('volume-val'),
-            profileLabel: document.getElementById('active-profile-label'),
-            myId: document.getElementById('my-id'),
-            targetId: document.getElementById('target-id'),
-            qrcode: document.getElementById('qrcode'),
-            scannerModal: document.getElementById('scanner-modal')
+            profileLabel: document.getElementById('active-profile-label')
         };
-
-        let scanner = null;
 
         // Initialize visualizer bars
         for (let i = 0; i < 20; i++) {
@@ -55,27 +46,28 @@
         function updateUI() {
             // LED - Connection
             DOM.ledConn.className = 'led led-conn ' + (state.isConnected ? 'paired' : 'disconnected');
-            
+            DOM.btnPair.style.display = state.isConnected ? 'none' : 'flex';
+
             // LED - Mode
             DOM.ledMode.className = 'led led-mode';
             if (state.mode === 'transmitter') DOM.ledMode.classList.add('tx-active');
             if (state.mode === 'receiver') DOM.ledMode.classList.add('rx-active');
- 
+
             // Mode Buttons
             DOM.btnTx.classList.toggle('active', state.mode === 'transmitter');
             DOM.btnTx.classList.toggle('tx', state.mode === 'transmitter');
             DOM.btnRx.classList.toggle('active', state.mode === 'receiver');
             DOM.btnRx.classList.toggle('rx', state.mode === 'receiver');
- 
+
             // Talk Button
-            const canTalk = state.isConnected && state.mode === 'transmitter';
+            const canTalk = state.isConnected && state.mode;
             DOM.btnTalk.disabled = !canTalk;
             DOM.btnTalk.classList.toggle('ready', canTalk && !state.isTalking);
             DOM.btnTalk.classList.toggle('active', state.isTalking);
             
             DOM.talkLabel.innerText = state.isTalking ? 'Stop' : 'Start Talk';
             DOM.talkIcon.innerText = state.isTalking ? '■' : '▶';
- 
+
             // Visualizer Reset
             if (!state.isTalking) {
                 const bars = DOM.viz.querySelectorAll('.bar');
@@ -86,112 +78,34 @@
             }
         }
 
-        // --- P2P Networking ---
-        function initPeer() {
-            state.peer = new Peer({
-                host: '0.peerjs.com',
-                port: 443,
-                secure: true,
-                debug: 1
-            });
-
-            state.peer.on('open', (id) => {
-                DOM.myId.innerText = id;
-                DOM.status.innerText = "Network Ready. Share your ID.";
-                generateQRCode(id);
-            });
-
-            state.peer.on('error', (err) => {
-                console.error("PeerJS Error:", err);
-                DOM.status.innerText = "Network Error: " + err.type;
-            });
-
-            state.peer.on('call', async (call) => {
-                DOM.status.innerText = "Incoming Voice Call...";
-                state.isConnected = true;
-                state.mode = 'receiver';
-                state.activeCall = call;
-                
-                call.answer(); 
-                
-                call.on('stream', (remoteStream) => {
-                    DOM.status.innerText = "Receiving Audio...";
-                    state.isTalking = true;
-                    initAudioChain(remoteStream);
-                    initVisualizer('active-rx');
-                    updateUI();
-                });
-
-                call.on('close', stopSession);
-                updateUI();
-            });
-        }
-
-        function copyMyId() {
-            const id = DOM.myId.innerText;
-            if (id === '---') return;
-            navigator.clipboard.writeText(id);
-            DOM.status.innerText = "ID Copied to clipboard!";
-            setTimeout(() => DOM.status.innerText = "Network Ready.", 2000);
-        }
-
-        function generateQRCode(id) {
-            DOM.qrcode.innerHTML = "";
-            DOM.qrcode.style.display = "block";
-            new QRCode(DOM.qrcode, {
-                text: id,
-                width: 140,
-                height: 140,
-                colorDark : "#000000",
-                colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.H
-            });
-        }
-
-        async function startScanner() {
-            DOM.scannerModal.style.display = "flex";
-            scanner = new Html5Qrcode("reader");
-            
-            try {
-                const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-                await scanner.start({ facingMode: "environment" }, config, (decodedText) => {
-                    DOM.targetId.value = decodedText;
-                    stopScanner();
-                    pairDevice();
-                });
-            } catch (err) {
-                console.error("Scanner Error:", err);
-                DOM.status.innerText = "Scanner Error: " + err;
-                stopScanner();
-            }
-        }
-
-        async function stopScanner() {
-            try {
-                if (scanner) {
-                    await scanner.stop();
-                }
-            } catch (err) {
-                console.warn("Scanner stop error:", err);
-            } finally {
-                scanner = null;
-                DOM.scannerModal.style.display = "none";
-            }
-        }
-
+        // --- Actions ---
         async function pairDevice() {
-            const target = DOM.targetId.value.trim();
-            if (!target) {
-                DOM.status.innerText = "Enter a valid Remote ID";
-                return;
-            }
-
-            DOM.status.innerText = "Connecting to " + target + "...";
+            DOM.status.innerText = "Initializing Bluetooth adapter...";
             DOM.btnPair.disabled = true;
 
-            state.remotePeerId = target;
-            state.isConnected = true;
-            DOM.status.innerText = "Linked to Remote Peer";
+            try {
+                if (!window.isSecureContext) {
+                    throw new Error("HTTPS Required");
+                }
+                if (navigator.bluetooth) {
+                    const device = await navigator.bluetooth.requestDevice({
+                        acceptAllDevices: true
+                    });
+                    state.isConnected = true;
+                    DOM.status.innerText = `Linked to ${device.name || 'Bluetooth Device'}`;
+                } else {
+                    throw new Error("Web Bluetooth not supported");
+                }
+            } catch (err) {
+                console.warn("Bluetooth API Error:", err);
+                DOM.status.innerText = "Hardware not found. Starting simulation...";
+                
+                // Fallback simulation for demo purposes
+                await new Promise(r => setTimeout(r, 800));
+                state.isConnected = true;
+                DOM.status.innerText = "Simulated Device Connected";
+            }
+            
             DOM.btnPair.disabled = false;
             updateUI();
         }
@@ -199,13 +113,11 @@
         function setMode(mode) {
             if (state.isTalking) stopSession();
             
+            // Mutually exclusive toggle
             state.mode = (state.mode === mode) ? null : mode;
             
             if (state.mode) {
                 DOM.status.innerText = `${mode.toUpperCase()} mode active`;
-                if (mode === 'receiver') {
-                    DOM.status.innerText += " | Waiting for remote voice...";
-                }
             } else {
                 DOM.status.innerText = "Select a communication mode";
             }
@@ -218,39 +130,48 @@
         }
 
         async function startSession() {
-            if (!state.audioCtx) {
-                state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (state.audioCtx.state === 'suspended') {
-                await state.audioCtx.resume();
+            state.isTalking = true;
+            updateUI();
+
+            // Handle AudioContext initialization and resume
+            try {
+                if (!window.isSecureContext) {
+                    throw new Error("HTTPS Required for Mic/Bluetooth");
+                }
+                
+                if (!state.audioCtx) {
+                    state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (state.audioCtx.state === 'suspended') {
+                    await state.audioCtx.resume();
+                }
+            } catch (e) {
+                console.error("Context Error:", e);
+                DOM.status.innerText = "Error: " + e.message;
+                stopSession();
+                return;
             }
 
             if (state.mode === 'transmitter') {
-                DOM.status.innerText = "Capturing Mic...";
+                DOM.status.innerText = "Mic ACTIVE | Analyzing voice...";
                 try {
-                    state.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    
-                    // Initialize chain and process locally for feedback
-                    initAudioChain(state.stream);
-                    
-                    // Establish real WebRTC call
-                    if (state.remotePeerId) {
-                        // Create a destination node to capture processed audio
-                        const dest = state.audioCtx.createMediaStreamDestination();
-                        state.gainNode.connect(dest);
-                        
-                        state.activeCall = state.peer.call(state.remotePeerId, dest.stream);
-                        DOM.status.innerText = "Transmitting Voice...";
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        throw new Error("Mic API not supported");
                     }
-                    
-                    state.isTalking = true;
+                    state.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    initAudioChain(state.stream);
                     initVisualizer('active-tx');
                 } catch (err) {
-                    DOM.status.innerText = "Mic Error: " + err.message;
+                    DOM.status.innerText = "Mic Error: " + (err.name === 'NotAllowedError' ? "Access Denied" : err.message);
+                    console.error(err);
                     stopSession();
                 }
+            } else {
+                DOM.status.innerText = "Speaker ACTIVE | Testing output...";
+                initAudioChain(null); // No stream for receiver, but we need the chain for test tones
+                playTestTone();
+                initVisualizer('active-rx', true);
             }
-            updateUI();
         }
 
         function initAudioChain(stream) {
@@ -365,6 +286,7 @@
             osc.start();
             osc.stop(state.audioCtx.currentTime + 1.5);
         }
+
         function stopSession() {
             state.isTalking = false;
             
@@ -399,11 +321,6 @@
                 }
             });
             state.filterNodes = { lowShelf: null, highShelf: null, peaking: null };
-
-            if (state.activeCall) {
-                state.activeCall.close();
-                state.activeCall = null;
-            }
             
             DOM.status.innerText = "Session ended. Ready.";
             updateUI();
@@ -449,5 +366,4 @@
         }
 
         // --- Final Init ---
-        initPeer();
         updateUI();
