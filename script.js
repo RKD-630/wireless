@@ -10,13 +10,18 @@
             vizFrame: null,
             oscillator: null,
             gainNode: null,
+            noiseFilter: null,
+            delayNode: null,
+            feedbackNode: null,
             filterNodes: {
                 lowShelf: null,
                 highShelf: null,
                 peaking: null
             },
             volume: 0.8,
-            profile: 'normal'
+            profile: 'normal',
+            intensity: 5,
+            noiseOff: false
         };
 
         const DOM = {
@@ -32,7 +37,9 @@
             viz: document.getElementById('viz'),
             volSlider: document.getElementById('vol-slider'),
             volVal: document.getElementById('volume-val'),
-            profileLabel: document.getElementById('active-profile-label')
+            profileLabel: document.getElementById('active-profile-label'),
+            intensityVal: document.getElementById('intensity-val'),
+            noiseOffToggle: document.getElementById('noise-off-toggle')
         };
 
         // Initialize visualizer bars
@@ -181,6 +188,20 @@
             state.gainNode = state.audioCtx.createGain();
             state.gainNode.gain.setValueAtTime(state.volume, state.audioCtx.currentTime);
 
+            state.noiseFilter = state.audioCtx.createBiquadFilter();
+            state.noiseFilter.type = 'highpass';
+            state.noiseFilter.frequency.setValueAtTime(20, state.audioCtx.currentTime);
+
+            // Echo Nodes
+            state.delayNode = state.audioCtx.createDelay(1.0);
+            state.feedbackNode = state.audioCtx.createGain();
+            state.delayNode.delayTime.setValueAtTime(0, state.audioCtx.currentTime);
+            state.feedbackNode.gain.setValueAtTime(0, state.audioCtx.currentTime);
+
+            // Connect feedback loop
+            state.delayNode.connect(state.feedbackNode);
+            state.feedbackNode.connect(state.delayNode);
+
             state.filterNodes.lowShelf = state.audioCtx.createBiquadFilter();
             state.filterNodes.lowShelf.type = 'lowshelf';
             
@@ -194,6 +215,10 @@
             applyAudioProfile();
 
             // Connect chain
+            state.noiseFilter.connect(state.filterNodes.lowShelf);
+            state.noiseFilter.connect(state.delayNode);
+            state.delayNode.connect(state.filterNodes.lowShelf);
+
             state.filterNodes.lowShelf.connect(state.filterNodes.highShelf);
             state.filterNodes.highShelf.connect(state.filterNodes.peaking);
             state.filterNodes.peaking.connect(state.gainNode);
@@ -201,7 +226,7 @@
 
             if (stream) {
                 const source = state.audioCtx.createMediaStreamSource(stream);
-                source.connect(state.filterNodes.lowShelf);
+                source.connect(state.noiseFilter);
                 
                 // Analyser connection
                 state.analyser = state.audioCtx.createAnalyser();
@@ -218,6 +243,17 @@
             }
         }
 
+        function adjustIntensity(delta) {
+            state.intensity = Math.max(1, Math.min(10, state.intensity + delta));
+            DOM.intensityVal.innerText = state.intensity;
+            applyAudioProfile();
+        }
+
+        function toggleNoise(enabled) {
+            state.noiseOff = enabled;
+            applyAudioProfile();
+        }
+
         function setAudioProfile(profile) {
             state.profile = profile;
             DOM.profileLabel.innerText = profile.toUpperCase();
@@ -229,42 +265,55 @@
 
             const { lowShelf, highShelf, peaking } = state.filterNodes;
             const now = state.audioCtx.currentTime;
+            const mult = state.intensity / 5;
 
-            // Reset filters
+            // Reset filters & Echo
             lowShelf.gain.setTargetAtTime(0, now, 0.1);
             highShelf.gain.setTargetAtTime(0, now, 0.1);
             peaking.gain.setTargetAtTime(0, now, 0.1);
+            
+            if (state.delayNode) state.delayNode.delayTime.setTargetAtTime(0, now, 0.1);
+            if (state.feedbackNode) state.feedbackNode.gain.setTargetAtTime(0, now, 0.1);
+
+            // Handle Noise Suppression
+            if (state.noiseFilter) {
+                state.noiseFilter.frequency.setTargetAtTime(state.noiseOff ? 300 : 20, now, 0.1);
+            }
 
             switch (state.profile) {
                 case 'eco':
-                    // Vocal bandwidth optimization (300Hz - 3400Hz)
-                    lowShelf.frequency.setTargetAtTime(300, now, 0.1);
-                    lowShelf.gain.setTargetAtTime(-10, now, 0.1);
-                    highShelf.frequency.setTargetAtTime(3400, now, 0.1);
-                    highShelf.gain.setTargetAtTime(-10, now, 0.1);
+                    // Echo Effect
+                    if (state.delayNode) state.delayNode.delayTime.setTargetAtTime(0.25, now, 0.1);
+                    if (state.feedbackNode) state.feedbackNode.gain.setTargetAtTime(0.35 * mult, now, 0.1);
+                    
+                    // High Clarity EQ
+                    lowShelf.frequency.setTargetAtTime(400, now, 0.1);
+                    lowShelf.gain.setTargetAtTime(-15 * mult, now, 0.1);
+                    highShelf.frequency.setTargetAtTime(3000, now, 0.1);
+                    highShelf.gain.setTargetAtTime(-10 * mult, now, 0.1);
                     peaking.frequency.setTargetAtTime(1500, now, 0.1);
-                    peaking.gain.setTargetAtTime(6, now, 0.1);
+                    peaking.gain.setTargetAtTime(12 * mult, now, 0.1);
                     break;
                 case 'bass':
                     lowShelf.frequency.setTargetAtTime(200, now, 0.1);
-                    lowShelf.gain.setTargetAtTime(12, now, 0.1);
+                    lowShelf.gain.setTargetAtTime(12 * mult, now, 0.1);
                     break;
                 case 'treble':
                     highShelf.frequency.setTargetAtTime(3000, now, 0.1);
-                    highShelf.gain.setTargetAtTime(12, now, 0.1);
+                    highShelf.gain.setTargetAtTime(12 * mult, now, 0.1);
                     break;
                 case 'dj':
                     peaking.frequency.setTargetAtTime(1000, now, 0.1);
-                    peaking.gain.setTargetAtTime(8, now, 0.1);
+                    peaking.gain.setTargetAtTime(8 * mult, now, 0.1);
                     peaking.Q.setTargetAtTime(1, now, 0.1);
                     lowShelf.frequency.setTargetAtTime(150, now, 0.1);
-                    lowShelf.gain.setTargetAtTime(5, now, 0.1);
+                    lowShelf.gain.setTargetAtTime(5 * mult, now, 0.1);
                     break;
                 case 'beat':
                     lowShelf.frequency.setTargetAtTime(80, now, 0.1);
-                    lowShelf.gain.setTargetAtTime(10, now, 0.1);
+                    lowShelf.gain.setTargetAtTime(10 * mult, now, 0.1);
                     highShelf.frequency.setTargetAtTime(5000, now, 0.1);
-                    highShelf.gain.setTargetAtTime(6, now, 0.1);
+                    highShelf.gain.setTargetAtTime(6 * mult, now, 0.1);
                     break;
             }
         }
@@ -310,6 +359,14 @@
             if (state.gainNode) {
                 state.gainNode.disconnect();
                 state.gainNode = null;
+            }
+            if (state.delayNode) {
+                state.delayNode.disconnect();
+                state.delayNode = null;
+            }
+            if (state.feedbackNode) {
+                state.feedbackNode.disconnect();
+                state.feedbackNode = null;
             }
             if (state.analyser) {
                 state.analyser.disconnect();

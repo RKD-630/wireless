@@ -49,9 +49,9 @@
 
             <div class="audio-settings">
                 <div class="setting-group">
-                    <div class="setting-label">
-                        <span>Audio Profile</span>
-                        <span id="active-profile-label">Normal</span>
+                    <div class="setting-header">
+                        <span class="intensity-label">Audio Profile</span>
+                        <span id="active-profile-label" style="font-weight: 800; color: var(--accent-blue);">NORMAL</span>
                     </div>
                     <div class="profile-grid">
                         <label class="profile-option">
@@ -77,10 +77,28 @@
                     </div>
                 </div>
 
+                <div class="intensity-panel">
+                    <span class="intensity-label">Clarity Intensity</span>
+                    <div class="intensity-btns">
+                        <button class="i-btn" onclick="adjustIntensity(-1)">-</button>
+                        <span id="intensity-val" class="intensity-value">5</span>
+                        <button class="i-btn" onclick="adjustIntensity(1)">+</button>
+                    </div>
+                </div>
+
+                <div class="noise-container">
+                    <span class="intensity-label">Voice Optimization</span>
+                    <label class="noise-toggle">
+                        <input type="checkbox" id="noise-off-toggle" onchange="toggleNoise(this.checked)" />
+                        <div class="radio-custom"></div>
+                        <span class="noise-text">Noise Off</span>
+                    </label>
+                </div>
+
                 <div class="setting-group">
-                    <div class="setting-label">
-                        <span>Master Volume</span>
-                        <span id="volume-val">80%</span>
+                    <div class="setting-header">
+                        <span class="intensity-label">Master Volume</span>
+                        <span id="volume-val" class="intensity-value">80%</span>
                     </div>
                     <div class="volume-container">
                         <input type="range" id="vol-slider" min="0" max="100" value="80" oninput="updateVolume(this.value)" />
