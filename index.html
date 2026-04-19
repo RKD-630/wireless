@@ -2,7 +2,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>BlueTalk | Voice Over Bluetooth</title>
-    
     <!-- 
         TECHNICAL NOTE: 
         The Web Bluetooth API primarily handles low-energy (BLE) control and doesn't natively support 
@@ -108,19 +107,9 @@
             </div>
 
             <div class="controls">
-                <div id="connection-panel" class="connection-info">
-                    <div class="info-row">
-                        <span>My Station ID</span>
-                        <span id="local-peer-id">CONNECTING...</span>
-                    </div>
-                    <div class="peer-input-wrapper">
-                        <input type="text" id="remote-peer-id" class="peer-input" placeholder="Partner Station ID" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" />
-                    </div>
-                </div>
-
                 <button id="btn-pair" class="main-btn btn-pair" onclick="pairDevice()">
                     <svg class="icon" viewBox="0 0 24 24"><path d="M7 17l5-5-5-5M13 17l5-5-5-5"/></svg>
-                    <span>Establish Link</span>
+                    <span>Pair Device</span>
                 </button>
                 <button id="btn-talk" class="main-btn btn-talk" disabled="" onclick="toggleTalk()">
                     <span id="talk-icon">▶</span>
