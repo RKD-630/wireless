@@ -21,7 +21,11 @@
             volume: 0.8,
             profile: 'normal',
             intensity: 5,
-            noiseOff: false
+            noiseOff: false,
+            peer: null,
+            conn: null,
+            call: null,
+            remoteStream: null
         };
 
         const DOM = {
@@ -39,7 +43,10 @@
             volVal: document.getElementById('volume-val'),
             profileLabel: document.getElementById('active-profile-label'),
             intensityVal: document.getElementById('intensity-val'),
-            noiseOffToggle: document.getElementById('noise-off-toggle')
+            noiseOffToggle: document.getElementById('noise-off-toggle'),
+            localPeerId: document.getElementById('local-peer-id'),
+            remotePeerId: document.getElementById('remote-peer-id'),
+            connPanel: document.getElementById('connection-panel')
         };
 
         // Initialize visualizer bars
@@ -86,35 +93,89 @@
         }
 
         // --- Actions ---
+        // --- Actions ---
+        function generateShortId() {
+            return Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+
+        function initPeer() {
+            state.peer = new Peer(generateShortId());
+            
+            state.peer.on('open', (id) => {
+                DOM.localPeerId.innerText = id;
+                DOM.status.innerText = "Station Online. Share ID to pair.";
+            });
+
+            state.peer.on('connection', (conn) => {
+                state.conn = conn;
+                setupConnection();
+            });
+
+            state.peer.on('call', (call) => {
+                state.call = call;
+                if (state.mode === 'receiver') {
+                    call.answer(); 
+                    handleCall(call);
+                }
+            });
+
+            state.peer.on('error', (err) => {
+                console.error("Peer Error:", err);
+                DOM.status.innerText = "Link Error: " + err.type;
+                if (err.type === 'peer-unavailable') {
+                    DOM.btnPair.disabled = false;
+                }
+            });
+        }
+
+        function setupConnection() {
+            state.conn.on('open', () => {
+                state.isConnected = true;
+                DOM.status.innerText = "Link Established!";
+                DOM.connPanel.style.display = 'none';
+                updateUI();
+            });
+
+            state.conn.on('close', () => {
+                state.isConnected = false;
+                DOM.status.innerText = "Link Terminated.";
+                DOM.connPanel.style.display = 'flex';
+                updateUI();
+            });
+        }
+
+        function handleCall(call) {
+            call.on('stream', (remoteStream) => {
+                state.remoteStream = remoteStream;
+                if (state.mode === 'receiver') {
+                    DOM.status.innerText = "Receiving Incoming Voice...";
+                    initAudioChain(remoteStream);
+                    initVisualizer('active-rx');
+                }
+            });
+
+            call.on('close', () => {
+                stopSession();
+            });
+        }
+
         async function pairDevice() {
-            DOM.status.innerText = "Initializing Bluetooth adapter...";
+            const remoteId = DOM.remotePeerId.value.trim();
+            if (!remoteId) {
+                DOM.status.innerText = "Enter Partner Station ID first.";
+                return;
+            }
+
+            DOM.status.innerText = "Attempting Handshake...";
             DOM.btnPair.disabled = true;
 
             try {
-                if (!window.isSecureContext) {
-                    throw new Error("HTTPS Required");
-                }
-                if (navigator.bluetooth) {
-                    const device = await navigator.bluetooth.requestDevice({
-                        acceptAllDevices: true
-                    });
-                    state.isConnected = true;
-                    DOM.status.innerText = `Linked to ${device.name || 'Bluetooth Device'}`;
-                } else {
-                    throw new Error("Web Bluetooth not supported");
-                }
+                state.conn = state.peer.connect(remoteId);
+                setupConnection();
             } catch (err) {
-                console.warn("Bluetooth API Error:", err);
-                DOM.status.innerText = "Hardware not found. Starting simulation...";
-                
-                // Fallback simulation for demo purposes
-                await new Promise(r => setTimeout(r, 800));
-                state.isConnected = true;
-                DOM.status.innerText = "Simulated Device Connected";
+                DOM.status.innerText = "Connection Failed.";
+                DOM.btnPair.disabled = false;
             }
-            
-            DOM.btnPair.disabled = false;
-            updateUI();
         }
 
         function setMode(mode) {
@@ -160,7 +221,7 @@
             }
 
             if (state.mode === 'transmitter') {
-                DOM.status.innerText = "Mic ACTIVE | Analyzing voice...";
+                DOM.status.innerText = "Mic ACTIVE | Transmitting...";
                 try {
                     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                         throw new Error("Mic API not supported");
@@ -168,16 +229,20 @@
                     state.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                     initAudioChain(state.stream);
                     initVisualizer('active-tx');
+
+                    // Call the peer if we have a connection
+                    if (state.conn && state.conn.peer) {
+                        state.call = state.peer.call(state.conn.peer, state.stream);
+                    }
                 } catch (err) {
                     DOM.status.innerText = "Mic Error: " + (err.name === 'NotAllowedError' ? "Access Denied" : err.message);
                     console.error(err);
                     stopSession();
                 }
             } else {
-                DOM.status.innerText = "Speaker ACTIVE | Testing output...";
-                initAudioChain(null); // No stream for receiver, but we need the chain for test tones
+                DOM.status.innerText = "Receiver ACTIVE | Awaiting Voice...";
+                // Receiver waits for the 'call' event handled in initPeer
                 playTestTone();
-                initVisualizer('active-rx', true);
             }
         }
 
@@ -379,6 +444,13 @@
             });
             state.filterNodes = { lowShelf: null, highShelf: null, peaking: null };
             
+            // Close peer call
+            if (state.call) {
+                state.call.close();
+                state.call = null;
+            }
+            state.remoteStream = null;
+
             DOM.status.innerText = "Session ended. Ready.";
             updateUI();
         }
@@ -423,4 +495,5 @@
         }
 
         // --- Final Init ---
+        initPeer();
         updateUI();
