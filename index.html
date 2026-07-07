@@ -1,52 +1,305 @@
 <!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Pro Unicode ⇄ KrutiDev Converter</title>
-
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#2d2d30" />
+<title>Smart Paint - MS Paint Style with AI Shape Correction</title>
 
 <link rel="stylesheet" href="style.css" /></head>
+<body data-theme="light">
 
-
-<body>
-
-
-<div class="container">
-  <h1>⚡ Pro Unicode ⇄ KrutiDev Converter</h1>
-
-
-  <textarea id="inputText" placeholder="Type or paste text..."></textarea>
-
-
-  <div class="controls">
-    <select id="mode">
-      <option value="auto">Auto Detect</option>
-      <option value="uniToKruti">Unicode → KrutiDev</option>
-      <option value="krutiToUni">KrutiDev → Unicode</option>
-    </select>
-
-
-    <button onclick="toggleMode()">🔄 Shift</button>
-    <button onclick="copyText()">Copy</button>
-    <button onclick="clearText()">Clear</button>
-    <button onclick="downloadText()">Download</button>
-  </div>
-
-
-  <div class="stats">
-    Words: <span id="wordCount">0</span> |
-    Characters: <span id="charCount">0</span>
-  </div>
-
-
-  <textarea id="outputText" class="preview" readonly=""></textarea>
-
-
-  <div class="footer">Pro Converter | Fast • Smart • Accurate</div>
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="logo">🎨 Smart Paint</div>
+  <button class="btn" onclick="newCanvas()">📄 New</button>
+  <button class="btn" onclick="document.getElementById('fileInput').click()">📂 Open</button>
+  <input type="file" id="fileInput" accept="image/*,.svg" style="display:none" onchange="openFile(event)" />
+  <button class="btn" onclick="showBackgroundModal()">🪣 Background Color</button>
+  <button class="btn" onclick="saveProject()">💾 Save</button>
+  <button class="btn" onclick="showExportModal()">📤 Export</button>
+  <div class="sep"></div>
+  <button class="btn icon" onclick="undo()" title="Undo">↶</button>
+  <button class="btn icon" onclick="redo()" title="Redo">↷</button>
+  <div class="sep"></div>
+  <button class="btn icon" onclick="zoomIn()" title="Zoom In">🔍+</button>
+  <button class="btn icon" onclick="zoomOut()" title="Zoom Out">🔍−</button>
+  <button class="btn icon" onclick="resetZoom()" title="Fit">⤢</button>
+  <div class="sep"></div>
+  <button class="btn icon" onclick="toggleRuler()" title="Ruler" id="rulerBtn">📏</button>
+  <button class="btn icon" onclick="toggleGrid()" title="Grid" id="gridBtn">▦</button>
+  <button class="btn icon" onclick="flipH()" title="Flip H">⇄</button>
+  <button class="btn icon" onclick="flipV()" title="Flip V">⇅</button>
+  <button class="btn icon" onclick="rotateCanvas()" title="Rotate">↻</button>
+  <button class="btn icon" onclick="clearCanvas()" title="Clear">🗑</button>
+  <div style="flex:1"></div>
+  <button class="btn icon" onclick="toggleTheme()" title="Theme" id="themeBtn">🌙</button>
+  <button class="btn icon" onclick="toggleFullscreen()" title="Fullscreen">⛶</button>
+  <button class="btn icon" onclick="toggleSidebar()" title="Panel" id="panelBtn">☰</button>
 </div>
 
+<!-- Main -->
+<div class="main" style="position: relative;">
+  <!-- Selection Toolbar -->
+  <div id="selectionToolbar" style="display:none; position:absolute; top: 10px; right: 10px; z-index: 1000; background: var(--toolbar); padding: 5px; border: 1px solid var(--border); border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.5); gap: 5px; align-items: center;">
+    <button class="btn icon" onclick="copySelection()" title="Copy (Ctrl+C)">📋</button>
+    <button class="btn icon" onclick="cutSelection()" title="Cut (Ctrl+X)">✂️</button>
+    <button class="btn icon" onclick="pasteSelection()" title="Paste (Ctrl+V)">📋⬇️</button>
+    <button class="btn icon" onclick="deleteSelection()" title="Delete (Del)">🗑️</button>
+  </div>
+  
+  <!-- Perspective Toolbar -->
+  <div id="perspectiveToolbar" style="display:none; position:absolute; top: 10px; right: 10px; z-index: 1000; background: var(--toolbar); padding: 5px; border: 1px solid var(--border); border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.5); gap: 5px; align-items: center;">
+    <button class="btn primary" onclick="applyPerspectiveCrop()">✅ Apply Crop</button>
+    <button class="btn" onclick="cancelPerspectiveCrop()">❌ Cancel</button>
+  </div>
+
+  <!-- Text Format Toolbar -->
+  <div class="text-format-bar" id="textFormatBar">
+    <select id="tfFont" onchange="updateActiveText('fontFamily', this.value)">
+      <option value="Arial">Arial</option>
+      <option value="Times New Roman">Times New Roman</option>
+      <option value="Courier">Courier</option>
+      <option value="Verdana">Verdana</option>
+      <option value="Comic Sans MS">Comic Sans MS</option>
+    </select>
+    <input type="number" id="tfSize" min="8" max="200" oninput="updateActiveText('fontSize', this.value + 'px')" style="width:60px" title="Font Size" />
+    <button class="btn icon" id="tfBold" onclick="toggleActiveText('fontWeight', 'bold', 'normal')" title="Bold"><b>B</b></button>
+    <button class="btn icon" id="tfItalic" onclick="toggleActiveText('fontStyle', 'italic', 'normal')" title="Italic"><i>I</i></button>
+    <button class="btn icon" id="tfUnderline" onclick="toggleActiveText('textDecoration', 'underline', 'none')" title="Underline"><u>U</u></button>
+    <div class="sep"></div>
+    <select id="tfColorType" onchange="toggleTextGradientUI()" style="width:80px">
+      <option value="solid">Solid</option>
+      <option value="gradient">Gradient</option>
+    </select>
+    <div id="tfSolidOpts" style="display:flex; align-items:center; gap:4px;">
+      <input type="color" id="tfColor" oninput="updateActiveText('color', this.value)" style="width:30px;height:24px;padding:0;border:none;cursor:pointer;" title="Text Color" />
+    </div>
+    <div id="tfGradOpts" style="display:none; align-items:center; gap:4px;">
+      <input type="color" id="tfGrad1" value="#ff0000" oninput="applyGradientToText()" style="width:24px;height:24px;padding:0;border:none;cursor:pointer;" title="Color 1" />
+      <input type="color" id="tfGrad2" value="#0000ff" oninput="applyGradientToText()" style="width:24px;height:24px;padding:0;border:none;cursor:pointer;" title="Color 2" />
+      <input type="number" id="tfGradAngle" value="90" oninput="applyGradientToText()" style="width:50px" title="Angle" />
+    </div>
+    <div class="sep"></div>
+    <select id="tfWordArt" onchange="applyWordArt(this.value)">
+      <option value="none">Normal Text</option>
+      <option value="wa1">🌈 Rainbow</option>
+      <option value="wa2">🧊 3D Block</option>
+      <option value="wa3">⭐ Pop Art</option>
+      <option value="wa4">⚙️ Chrome</option>
+    </select>
+  </div>
+
+  <!-- Brush Menu Options -->
+  <div class="brush-menu" id="brushMenu">
+    <button class="brush-option active" onclick="setBrushType('round', this)">🖌️ Round Brush</button>
+    <button class="brush-option" onclick="setBrushType('square', this)">⬛ Square Brush</button>
+    <button class="brush-option" onclick="setBrushType('marker', this)">🖍️ Marker</button>
+    <button class="brush-option" onclick="setBrushType('highlighter', this)">🖋️ Highlighter</button>
+    <button class="brush-option" onclick="setBrushType('airbrush', this)">💨 Airbrush</button>
+  </div>
+
+  <!-- Select Menu Options -->
+  <div class="brush-menu" id="selectMenu">
+    <button class="brush-option active" onclick="setSelectType('rect', this)">⬚ Rectangular Marquee</button>
+    <!-- Add more marquee types here if needed -->
+  </div>
+
+  <!-- Crop Menu Options -->
+  <div class="brush-menu" id="cropMenu">
+    <button class="brush-option active" onclick="setCropType('normal', this)">✂️ Normal Crop</button>
+    <button class="brush-option" onclick="setCropType('perspective', this)">📐 Perspective Crop</button>
+  </div>
+
+  <!-- Left Toolbar -->
+  <div class="left-toolbar">
+    <button class="tool-btn active" data-tool="pencil" data-tooltip="Pencil (P)" title="Pencil (P)">✏️</button>
+    <button class="tool-btn" data-tool="freehand" data-tooltip="Freehand (Smart)" title="Freehand (Smart)">✍️</button>
+    <button class="tool-btn" data-tool="select" data-tooltip="Select" title="Select">⬚</button>
+    <button class="tool-btn" data-tool="crop" data-tooltip="Crop" title="Crop">✂️</button>
+    <button class="tool-btn" data-tool="lasso" data-tooltip="Lasso Select" title="Lasso Select">➰</button>
+    <button class="tool-btn" data-tool="move" data-tooltip="Move Layer (V)" title="Move Layer (V)">✥</button>
+    <button class="tool-btn" data-tool="brush" data-tooltip="Brush (B)" title="Brush (B)">🖌️</button>
+    <button class="tool-btn" data-tool="airbrush" data-tooltip="Airbrush (A)" title="Airbrush (A)">💨</button>
+    <button class="tool-btn" data-tool="eraser" data-tooltip="Eraser (E)" title="Eraser (E)">🧽</button>
+    <button class="tool-btn" data-tool="undo-brush" data-tooltip="Undo Brush (U)" title="Undo Brush (U)">🔙</button>
+    <button class="tool-btn" data-tool="fill" data-tooltip="Fill (F)" title="Fill (F)">🪣</button>
+    <button class="tool-btn" data-tool="picker" data-tooltip="Color Picker (I)" title="Color Picker (I)">💧</button>
+    <button class="tool-btn" data-tool="text" data-tooltip="Text (T)" title="Text (T)">🔤</button>
+    <button class="tool-btn" data-tool="line" data-tooltip="Line (L)" title="Line (L)">📏</button>
+    <button class="tool-btn" data-tool="rect" data-tooltip="Rectangle (R)" title="Rectangle (R)">▭</button>
+    <button class="tool-btn" data-tool="rrect" data-tooltip="Rounded Rect" title="Rounded Rect">▢</button>
+    <button class="tool-btn" data-tool="circle" data-tooltip="Circle (C)" title="Circle (C)">◯</button>
+    <button class="tool-btn" data-tool="ellipse" data-tooltip="Ellipse" title="Ellipse">⬭</button>
+    <button class="tool-btn" data-tool="triangle" data-tooltip="Triangle" title="Triangle">△</button>
+    <button class="tool-btn" data-tool="isosceles" data-tooltip="Isosceles" title="Isosceles">▲</button>
+    <button class="tool-btn" data-tool="acute-triangle" data-tooltip="Acute Triangle" title="Acute Triangle">🔺</button>
+    <button class="tool-btn" data-tool="right-triangle" data-tooltip="Right Triangle" title="Right Triangle">📐</button>
+    <button class="tool-btn" data-tool="diamond" data-tooltip="Diamond" title="Diamond">♦</button>
+    <button class="tool-btn" data-tool="quad" data-tooltip="Quadrilateral" title="Quadrilateral">◇</button>
+    <button class="tool-btn" data-tool="parallelogram" data-tooltip="Parallelogram" title="Parallelogram">▱</button>
+    <button class="tool-btn" data-tool="pentagon" data-tooltip="Pentagon" title="Pentagon">⬠</button>
+    <button class="tool-btn" data-tool="hexagon" data-tooltip="Hexagon" title="Hexagon">⬡</button>
+    <button class="tool-btn" data-tool="star" data-tooltip="Star" title="Star">⭐</button>
+    <button class="tool-btn" data-tool="arrow" data-tooltip="Arrow" title="Arrow">➤</button>
+    <button class="tool-btn" data-tool="polygon" data-tooltip="Polygon" title="Polygon">⬣</button>
+    <button class="tool-btn" data-tool="cone" data-tooltip="Cone" title="Cone">🍦</button>
+    <button class="tool-btn" data-tool="cylinder" data-tooltip="Cylinder" title="Cylinder">🛢️</button>
+    <button class="tool-btn" data-tool="cube" data-tooltip="Cube" title="Cube">🧊</button>
+    <button class="tool-btn" data-tool="semi-circle" data-tooltip="Semi-Circle" title="Semi-Circle">🌗</button>
+    <button class="tool-btn" data-tool="arch" data-tooltip="Arch" title="Arch">⛩️</button>
+    <button class="tool-btn" data-tool="curve" data-tooltip="Curve" title="Curve">〰️</button>
+  </div>
+
+  <!-- Canvas -->
+  <div class="canvas-wrap" id="canvasWrap">
+    <div class="canvas-container pencil" id="canvasContainer">
+      <canvas id="mainCanvas"></canvas>
+      <canvas id="previewCanvas"></canvas>
+      <canvas id="gridCanvas"></canvas>
+      <div id="textLayer"></div>
+    </div>
+  </div>
+
+  <!-- Right Sidebar -->
+  <div class="right-sidebar" id="rightSidebar">
+    <div class="sidebar-section">
+      <h4>Canvas</h4>
+      <button class="btn" onclick="showResizeModal()" style="width:100%;margin-bottom:4px">Resize Image/Canvas</button>
+      <button class="btn" onclick="toggleTransparent()" id="transpBtn" style="width:100%;margin-bottom:6px">Transparent BG: OFF</button>
+      <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
+        <input type="checkbox" id="lockCanvas" onchange="state.canvasLocked = this.checked" /> Fix Canvas Position
+      </label>
+    </div>
+
+    <div class="sidebar-section">
+      <h4>Effects</h4>
+      <button class="btn" onclick="applyPhotoSketch()" style="width:100%;margin-bottom:4px">Photo Sketch</button>
+    </div>
+
+    <div class="sidebar-section">
+      <h4>Colors</h4>
+      <div class="color-row">
+        <div class="color-preview" id="fgPreview" style="background:#000000">
+          <input type="color" id="fgColor" value="#000000" />
+        </div>
+        <div style="font-size:11px">FG</div>
+        <div class="color-preview" id="bgPreview" style="background:#ffffff">
+          <input type="color" id="bgColor" value="#ffffff" />
+        </div>
+        <div style="font-size:11px">BG</div>
+        <button class="btn icon" onclick="swapColors()" title="Swap">⇄</button>
+      </div>
+      <input type="text" id="hexInput" value="#000000" style="width:100%;padding:4px;border:1px solid var(--border);border-radius:4px;background:var(--toolbar);color:var(--text);font-size:12px;margin-bottom:8px" placeholder="#HEX" />
+      <div class="color-swatch-grid" id="swatchGrid"></div>
+    </div>
+
+    <div class="sidebar-section">
+      <h4>Brush Settings</h4>
+      <div class="slider-row">
+        <label>Size</label>
+        <input type="range" id="brushSize" min="1" max="100" value="4" />
+        <span class="val" id="brushSizeVal">4</span>
+      </div>
+      <div class="slider-row">
+        <label>Opacity</label>
+        <input type="range" id="brushOpacity" min="1" max="100" value="100" />
+        <span class="val" id="brushOpacityVal">100</span>
+      </div>
+      <div class="slider-row">
+        <label>Smoothing</label>
+        <input type="range" id="smoothing" min="0" max="100" value="50" />
+        <span class="val" id="smoothingVal">50</span>
+      </div>
+      <div class="slider-row">
+        <label>Hardness</label>
+        <input type="range" id="hardness" min="0" max="100" value="100" />
+        <span class="val" id="hardnessVal">100</span>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h4>Gradient</h4>
+      <select id="gradientType" style="width:100%;padding:4px;border:1px solid var(--border);border-radius:4px;background:var(--toolbar);color:var(--text);margin-bottom:6px">
+        <option value="solid">Solid Color</option>
+        <option value="linear">Linear Gradient</option>
+        <option value="radial">Radial Gradient</option>
+      </select>
+      <div class="slider-row">
+        <label>Angle</label>
+        <input type="range" id="gradAngle" min="0" max="360" value="90" />
+        <span class="val" id="gradAngleVal">90°</span>
+      </div>
+      <div class="color-row">
+        <div class="color-preview" id="gradColor1" style="background:#ff0000">
+          <input type="color" id="gradColor1Input" value="#ff0000" />
+        </div>
+        <span style="font-size:11px">→</span>
+        <div class="color-preview" id="gradColor2" style="background:#0000ff">
+          <input type="color" id="gradColor2Input" value="#0000ff" />
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h4>Fill Style</h4>
+      <select id="fillStyle" style="width:100%;padding:4px;border:1px solid var(--border);border-radius:4px;background:var(--toolbar);color:var(--text)">
+        <option value="stroke">Outline Only</option>
+        <option value="fill">Fill Only</option>
+        <option value="both">Fill + Outline</option>
+      </select>
+    </div>
+
+    <div class="sidebar-section">
+      <h4>Layers</h4>
+      <div style="display:flex;gap:4px;margin-bottom:8px">
+        <button class="btn" onclick="addLayer()" style="flex:1">+ Add</button>
+        <button class="btn" onclick="deleteLayer()">🗑</button>
+      </div>
+      <div class="slider-row">
+        <label>Opacity</label>
+        <input type="range" id="layerOpacity" min="0" max="100" value="100" oninput="updateLayerOpacity(this.value)" />
+        <span class="val" id="layerOpacityVal">100</span>
+      </div>
+      <div class="layers-list" id="layersList"></div>
+    </div>
+
+    </div>
+  </div>
 
 
+<!-- Bottom Toolbar (Mobile) -->
+<div class="bottom-toolbar">
+  <button class="tool-btn" onclick="undo()" title="Undo">↶</button>
+  <button class="tool-btn" onclick="redo()" title="Redo">↷</button>
+  <div class="sep" style="height:30px"></div>
+  <div class="color-preview" id="fgPreviewMobile" style="background:#000000;width:36px;height:36px" title="Color">
+    <input type="color" id="fgColorMobile" value="#000000" />
+  </div>
+  <input type="range" id="brushSizeMobile" min="1" max="100" value="4" style="width:100px" title="Brush Size" />
+  <button class="tool-btn" onclick="zoomIn()" title="Zoom In">🔍+</button>
+  <button class="tool-btn" onclick="zoomOut()" title="Zoom Out">🔍−</button>
+  <button class="tool-btn" onclick="toggleSidebar()" title="Toggle Menu">☰</button>
+</div>
+
+<!-- Status Bar -->
+<div class="statusbar">
+  <span id="statusTool">Tool: Pencil</span>
+  <span id="statusSize">Size: 4</span>
+  <span id="statusPos">X: 0, Y: 0</span>
+  <span id="statusZoom">Zoom: 100%</span>
+  <span id="statusCanvas">Canvas: 1200×800</span>
+</div>
+
+<!-- Popup -->
+<div class="popup hidden" id="popup">
+  <span id="popupText">Shape Corrected</span>
+  <button onclick="acceptCorrection()">Accept</button>
+  <button onclick="undoCorrection()">Undo</button>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal" id="modalContent"></div>
+</div>
 
 
 
